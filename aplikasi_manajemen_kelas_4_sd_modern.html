@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Manajemen Kelas 4 SD Modern</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out forwards; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <div id="app" class="flex-grow flex flex-col">
+        <!-- Konten dinamis akan dimuat oleh JavaScript -->
+    </div>
+
+    <!-- Notification Modal (Pengganti Alert) -->
+    <div id="customModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 hidden">
+        <div class="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl fade-in text-center">
+            <div id="modalIcon" class="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 text-xl"></div>
+            <h3 id="modalTitle" class="text-lg font-bold text-slate-900 mb-2"></h3>
+            <p id="modalMessage" class="text-slate-600 text-sm mb-6"></p>
+            <button onclick="closeModal()" class="w-full py-2.5 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition">Mengerti</button>
+        </div>
+    </div>
+
+    <!-- Modal Form Tambah/Edit Siswa -->
+    <div id="studentModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 hidden">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full mx-4 shadow-2xl fade-in max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h3 id="studentModalTitle" class="text-xl font-bold text-slate-900">Tambah Siswa Baru</h3>
+                <button onclick="closeStudentModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form onsubmit="handleSaveStudent(event)" class="space-y-4">
+                <input type="hidden" id="studentEditId">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Nama Lengkap Siswa</label>
+                    <input type="text" id="inputStudentName" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Contoh: Rian Utama">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">NISN</label>
+                    <input type="text" id="inputStudentNisn" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="1006">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Tanggal Lahir (Verifikasi Wali Murid)</label>
+                    <input type="date" id="inputStudentBirth" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Jenis Kelamin</label>
+                    <select id="inputStudentGender" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="L">Laki-laki</option>
+                        <option value="P">Perempuan</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Proyek P5</label>
+                    <input type="text" id="inputStudentP5" value="Mandiri & Kreatif" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500">Catatan/Komentar Guru (AI)</label>
+                        <button type="button" onclick="generateAiComment()" class="text-xs bg-purple-100 text-purple-700 hover:bg-purple-200 px-2 py-1 rounded-lg font-semibold transition flex items-center space-x-1">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> <span>Buat dengan AI</span>
+                        </button>
+                    </div>
+                    <textarea id="inputStudentNotes" rows="2" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" placeholder="Catatan perkembangan belajar siswa..."></textarea>
+                </div>
+                <div class="pt-2">
+                    <button type="submit" class="w-full py-3.5 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition shadow-lg shadow-indigo-600/30">Simpan Data Siswa</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- JavaScript Aplikasi -->
+    <script>
+        const defaultStudents = [
+            { 
+                id: 1, nisn: "1001", name: "Ahmad Fauzan", birthDate: "2015-05-14", gender: "L", attendance: { sakit: 0, izin: 1, alfa: 0 }, p5: "Berkebhinekaan Global", 
+                grades: { 
+                    matematika: { uh: [85, 88], sts: 84, sas: 86 }, 
+                    ipas: { uh: [90, 92], sts: 88, sas: 90 }, 
+                    bindo: { uh: [88, 85], sts: 89, sas: 90 } 
+                }, 
+                notes: "Menunjukkan kemajuan yang sangat baik dalam sains dan bahasa." 
+            },
+            { 
+                id: 2, nisn: "1002", name: "Siti Aminah", birthDate: "2015-08-20", gender: "P", attendance: { sakit: 0, izin: 0, alfa: 0 }, p5: "Mandiri", 
+                grades: { 
+                    matematika: { uh: [92, 95], sts: 90, sas: 94 }, 
+                    ipas: { uh: [95, 96], sts: 94, sas: 95 }, 
+                    bindo: { uh: [90, 92], sts: 88, sas: 91 } 
+                }, 
+                notes: "Siswa berprestasi dengan kedisiplinan dan nilai yang konsisten tinggi." 
+            },
+            { 
+                id: 3, nisn: "1003", name: "Budi Santoso", birthDate: "2015-01-10", gender: "L", attendance: { sakit: 2, izin: 0, alfa: 1 }, p5: "Gotong Royong", 
+                grades: { 
+                    matematika: { uh: [75, 80], sts: 78, sas: 79 }, 
+                    ipas: { uh: [82, 80], sts: 81, sas: 84 }, 
+                    bindo: { uh: [80, 78], sts: 80, sas: 82 } 
+                }, 
+                notes: "Perlu bimbingan lebih giat dalam matematika dasar." 
+            },
+            { 
+                id: 4, nisn: "1004", name: "Dewi Lestari", birthDate: "2015-11-03", gender: "P", attendance: { sakit: 0, izin: 0, alfa: 0 }, p5: "Kreatif", 
+                grades: { 
+                    matematika: { uh: [88, 90], sts: 87, sas: 89 }, 
+                    ipas: { uh: [89, 91], sts: 88, sas: 90 }, 
+                    bindo: { uh: [92, 94], sts: 91, sas: 93 } 
+                }, 
+                notes: "Sangat kreatif dan aktif dalam kerja kelompok P5." 
+            },
+            { 
+                id: 5, nisn: "1005", name: "Rizky Pratama", birthDate: "2015-03-25", gender: "L", attendance: { sakit: 1, izin: 1, alfa: 0 }, p5: "Bernalar Kritis", 
+                grades: { 
+                    matematika: { uh: [80, 82], sts: 79, sas: 81 }, 
+                    ipas: { uh: [85, 86], sts: 84, sas: 86 }, 
+                    bindo: { uh: [83, 84], sts: 82, sas: 85 } 
+                }, 
+                notes: "Memiliki rasa ingin tahu yang tinggi dalam pelajaran IPAS." 
+            }
+        ];
+
+        let state = {
+            currentUser: JSON.parse(localStorage.getItem('class4_user')) || null,
+            activeTab: 'dashboard',
+            loginRole: 'teacher',
+            academicYear: localStorage.getItem('class4_academicyear') || "2025/2026",
+            semester: localStorage.getItem('class4_semester') || "Genap",
+            students: JSON.parse(localStorage.getItem('class4_students')) || defaultStudents,
+            announcements: JSON.parse(localStorage.getItem('class4_announcements')) || [
+                { id: 1, title: "Jadwal PTS Semester Genap", date: "2026-03-10", content: "Penilaian Tengah Semester akan dimulai hari Senin pekan depan. Mohon bimbingan belajar di rumah." },
+                { id: 2, title: "Kegiatan Outbound Kelas 4", date: "2026-03-15", content: "Siswa diharapkan membawa pakaian ganti dan bekal sehat dari rumah." }
+            ]
+        };
+
+        function saveState() {
+            localStorage.setItem('class4_students', JSON.stringify(state.students));
+            localStorage.setItem('class4_announcements', JSON.stringify(state.announcements));
+            localStorage.setItem('class4_user', JSON.stringify(state.currentUser));
+            localStorage.setItem('class4_academicyear', state.academicYear);
+            localStorage.setItem('class4_semester', state.semester);
+        }
+
+        function showModal(title, message, type = 'success') {
+            const modal = document.getElementById('customModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalMessage = document.getElementById('modalMessage');
+            const modalIcon = document.getElementById('modalIcon');
+
+            modalTitle.innerText = title;
+            modalMessage.innerText = message;
+            
+            if(type === 'success') {
+                modalIcon.className = "w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 text-xl bg-emerald-100 text-emerald-600";
+                modalIcon.innerHTML = '<i class="fa-solid fa-check"></i>';
+            } else {
+                modalIcon.className = "w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 text-xl bg-rose-100 text-rose-600";
+                modalIcon.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('customModal').classList.add('hidden');
+        }
+
+        function openAddStudentModal() {
+            document.getElementById('studentModalTitle').innerText = "Tambah Siswa Baru";
+            document.getElementById('studentEditId').value = "";
+            document.getElementById('inputStudentName').value = "";
+            document.getElementById('inputStudentNisn').value = "";
+            document.getElementById('inputStudentBirth').value = "2015-06-01";
+            document.getElementById('inputStudentGender').value = "L";
+            document.getElementById('inputStudentP5').value = "Mandiri & Kreatif";
+            document.getElementById('inputStudentNotes').value = "";
+            document.getElementById('studentModal').classList.remove('hidden');
+        }
+
+        function openEditStudentModal(id) {
+            const student = state.students.find(s => s.id === id);
+            if(!student) return;
+            document.getElementById('studentModalTitle').innerText = "Edit Data Siswa";
+            document.getElementById('studentEditId').value = student.id;
+            document.getElementById('inputStudentName').value = student.name;
+            document.getElementById('inputStudentNisn').value = student.nisn;
+            document.getElementById('inputStudentBirth').value = student.birthDate;
+            document.getElementById('inputStudentGender').value = student.gender;
+            document.getElementById('inputStudentP5').value = student.p5;
+            document.getElementById('inputStudentNotes').value = student.notes || "";
+            document.getElementById('studentModal').classList.remove('hidden');
+        }
+
+        function closeStudentModal() {
+            document.getElementById('studentModal').classList.add('hidden');
+        }
+
+        function handleSaveStudent(e) {
+            e.preventDefault();
+            const editId = document.getElementById('studentEditId').value;
+            const name = document.getElementById('inputStudentName').value;
+            const nisn = document.getElementById('inputStudentNisn').value;
+            const birthDate = document.getElementById('inputStudentBirth').value;
+            const gender = document.getElementById('inputStudentGender').value;
+            const p5 = document.getElementById('inputStudentP5').value;
+            const notes = document.getElementById('inputStudentNotes').value;
+
+            if(editId) {
+                const student = state.students.find(s => s.id === parseInt(editId));
+                if(student) {
+                    student.name = name;
+                    student.nisn = nisn;
+                    student.birthDate = birthDate;
+                    student.gender = gender;
+                    student.p5 = p5;
+                    student.notes = notes;
+                }
+                showModal("Berhasil", "Data siswa berhasil diperbarui.");
+            } else {
+                const newStudent = {
+                    id: Date.now(),
+                    nisn: nisn,
+                    name: name,
+                    birthDate: birthDate,
+                    gender: gender,
+                    attendance: { sakit: 0, izin: 0, alfa: 0 },
+                    p5: p5,
+                    grades: {
+                        matematika: { uh: [80, 80], sts: 80, sas: 80 },
+                        ipas: { uh: [80, 80], sts: 80, sas: 80 },
+                        bindo: { uh: [80, 80], sts: 80, sas: 80 }
+                    },
+                    notes: notes
+                };
+                state.students.push(newStudent);
+                showModal("Berhasil", "Siswa baru berhasil ditambahkan.");
+            }
+
+            saveState();
+            closeStudentModal();
+            renderTabContent();
+        }
+
+        function renderApp() {
+            const app = document.getElementById('app');
+            if (!state.currentUser) {
+                app.innerHTML = `
+                    <div class="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center p-4">
+                        <div class="bg-white/95 backdrop-blur rounded-3xl shadow-2xl max-w-md w-full p-8 fade-in">
+                            <div class="text-center mb-8">
+                                <div class="w-16 h-16 bg-indigo-600 text-white rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl shadow-lg shadow-indigo-500/30">
+                                    <i class="fa-solid fa-school"></i>
+                                </div>
+                                <h1 class="text-2xl font-bold text-slate-900">Kelas 4 SD Ceria</h1>
+                                <p class="text-slate-500 text-sm mt-1">Sistem Manajemen Kelas & Portal Wali Murid</p>
+                            </div>
+
+                            <div class="flex bg-slate-100 p-1 rounded-xl mb-6">
+                                <button type="button" onclick="switchLoginRole('teacher')" id="tabTeacher" class="flex-1 py-2 text-sm font-semibold rounded-lg transition ${state.loginRole === 'teacher' ? 'bg-white shadow text-indigo-600' : 'text-slate-500'}">Wali Kelas</button>
+                                <button type="button" onclick="switchLoginRole('parent')" id="tabParent" class="flex-1 py-2 text-sm font-semibold rounded-lg transition ${state.loginRole === 'parent' ? 'bg-white shadow text-indigo-600' : 'text-slate-500'}">Wali Murid</button>
+                            </div>
+
+                            <div id="loginFormContainer"></div>
+                        </div>
+                    </div>
+                `;
+                renderLoginForm();
+            } else {
+                renderDashboard();
+            }
+        }
+
+        function switchLoginRole(role) {
+            state.loginRole = role;
+            renderLoginForm();
+            document.getElementById('tabTeacher').className = `flex-1 py-2 text-sm font-semibold rounded-lg transition ${role === 'teacher' ? 'bg-white shadow text-indigo-600' : 'text-slate-500'}`;
+            document.getElementById('tabParent').className = `flex-1 py-2 text-sm font-semibold rounded-lg transition ${role === 'parent' ? 'bg-white shadow text-indigo-600' : 'text-slate-500'}`;
+        }
+
+        function renderLoginForm() {
+            const container = document.getElementById('loginFormContainer');
+            if (state.loginRole === 'teacher') {
+                container.innerHTML = `
+                    <form onsubmit="handleTeacherLogin(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Username Guru</label>
+                            <input type="text" id="teacherUser" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="walikelas4">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Password</label>
+                            <input type="password" id="teacherPass" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="••••••••">
+                        </div>
+                        <button type="submit" class="w-full py-3.5 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition shadow-lg shadow-indigo-600/30">Masuk sebagai Guru</button>
+                        <div class="text-center mt-3 text-xs text-slate-400">Demo: username <b>walikelas4</b> | pass <b>kelas4hebat</b></div>
+                    </form>
+                `;
+            } else {
+                let studentOptions = state.students.map(s => `<option value="${s.id}">${s.name} (NISN: ${s.nisn})</option>`).join('');
+                container.innerHTML = `
+                    <form onsubmit="handleParentLogin(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Pilih Nama Siswa</label>
+                            <select id="parentStudentId" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="">-- Pilih Anak Anda --</option>
+                                ${studentOptions}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Tanggal Lahir Siswa</label>
+                            <input type="date" id="parentBirthDate" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <button type="submit" class="w-full py-3.5 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition shadow-lg shadow-indigo-600/30">Masuk Portal Wali Murid</button>
+                        <div class="text-center mt-3 text-xs text-slate-400">Contoh tgl lahir Ahmad Fauzan: <b>2015-05-14</b></div>
+                    </form>
+                `;
+            }
+        }
+
+        function handleTeacherLogin(e) {
+            e.preventDefault();
+            const u = document.getElementById('teacherUser').value;
+            const p = document.getElementById('teacherPass').value;
+            if(u === 'walikelas4' && p === 'kelas4hebat') {
+                state.currentUser = { role: 'teacher', name: 'Ibu Guru (Wali Kelas)' };
+                saveState();
+                renderApp();
+            } else {
+                showModal("Login Gagal", "Username atau password guru salah!", "error");
+            }
+        }
+
+        function handleParentLogin(e) {
+            e.preventDefault();
+            const studentId = parseInt(document.getElementById('parentStudentId').value);
+            const birthDateInput = document.getElementById('parentBirthDate').value;
+
+            const student = state.students.find(s => s.id === studentId);
+            if(student && student.birthDate === birthDateInput) {
+                state.currentUser = { role: 'parent', name: `Wali dari ${student.name}`, studentId: student.id };
+                saveState();
+                renderApp();
+            } else {
+                showModal("Verifikasi Gagal", "Tanggal lahir tidak cocok dengan data siswa tersebut!", "error");
+            }
+        }
+
+        function logout() {
+            state.currentUser = null;
+            localStorage.removeItem('class4_user');
+            renderApp();
+        }
+
+        function renderDashboard() {
+            const app = document.getElementById('app');
+            const isTeacher = state.currentUser.role === 'teacher';
+
+            app.innerHTML = `
+                <!-- Navbar -->
+                <header class="bg-white border-b border-slate-200 sticky top-0 z-40">
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-bold shadow">
+                                <i class="fa-solid fa-graduation-cap"></i>
+                            </div>
+                            <div>
+                                <h1 class="font-bold text-slate-800 leading-tight">Kelas 4 Ceria</h1>
+                                <p class="text-xs text-slate-500">${state.currentUser.name}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <!-- Tahun Pelajaran & Semester Header Indicator -->
+                            <div class="hidden md:flex items-center space-x-2 bg-slate-100 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600">
+                                <i class="fa-solid fa-calendar-days text-indigo-600"></i>
+                                <span>TP: ${state.academicYear}</span>
+                                <span class="text-slate-300">|</span>
+                                <span>Sem: ${state.semester}</span>
+                            </div>
+                            <button onclick="logout()" class="px-4 py-2 bg-rose-50 text-rose-600 hover:bg-rose-100 font-semibold rounded-xl text-sm transition flex items-center space-x-2">
+                                <i class="fa-solid fa-right-from-bracket"></i>
+                                <span class="hidden sm:inline">Keluar</span>
+                            </button>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- Navigation Tabs -->
+                <nav class="bg-white border-b border-slate-200 shadow-sm">
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-4 overflow-x-auto">
+                        <button onclick="setActiveTab('dashboard')" class="py-3 px-3 font-semibold text-sm border-b-2 transition whitespace-nowrap ${state.activeTab === 'dashboard' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'}">
+                            <i class="fa-solid fa-house mr-1.5"></i> Ringkasan
+                        </button>
+                        ${isTeacher ? `
+                        <button onclick="setActiveTab('students')" class="py-3 px-3 font-semibold text-sm border-b-2 transition whitespace-nowrap ${state.activeTab === 'students' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'}">
+                            <i class="fa-solid fa-users mr-1.5"></i> Data Siswa
+                        </button>
+                        <button onclick="setActiveTab('grades')" class="py-3 px-3 font-semibold text-sm border-b-2 transition whitespace-nowrap ${state.activeTab === 'grades' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'}">
+                            <i class="fa-solid fa-book-open mr-1.5"></i> Penilaian (UH, STS, SAS)
+                        </button>
+                        <button onclick="setActiveTab('attendance')" class="py-3 px-3 font-semibold text-sm border-b-2 transition whitespace-nowrap ${state.activeTab === 'attendance' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'}">
+                            <i class="fa-solid fa-clipboard-user mr-1.5"></i> Absensi
+                        </button>
+                        <button onclick="setActiveTab('announcements')" class="py-3 px-3 font-semibold text-sm border-b-2 transition whitespace-nowrap ${state.activeTab === 'announcements' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'}">
+                            <i class="fa-solid fa-bullhorn mr-1.5"></i> Pengumuman
+                        </button>
+                        ` : `
+                        <button onclick="setActiveTab('child_detail')" class="py-3 px-3 font-semibold text-sm border-b-2 transition whitespace-nowrap ${state.activeTab === 'child_detail' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'}">
+                            <i class="fa-solid fa-child mr-1.5"></i> Rapor & Nilai Anak
+                        </button>
+                        <button onclick="setActiveTab('ai_consultant')" class="py-3 px-3 font-semibold text-sm border-b-2 transition whitespace-nowrap ${state.activeTab === 'ai_consultant' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'}">
+                            <i class="fa-solid fa-robot mr-1.5"></i> Konsultasi Belajar AI
+                        </button>
+                        <button onclick="setActiveTab('announcements')" class="py-3 px-3 font-semibold text-sm border-b-2 transition whitespace-nowrap ${state.activeTab === 'announcements' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'}">
+                            <i class="fa-solid fa-bullhorn mr-1.5"></i> Informasi Sekolah
+                        </button>
+                        `}
+                    </div>
+                </nav>
+
+                <!-- Main Content Area -->
+                <main class="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+                    <div id="tabContent"></div>
+                </main>
+
+                <!-- Footer -->
+                <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-400">
+                    Aplikasi Manajemen Kelas 4 SD Modern &copy; 2026
+                </footer>
+            `;
+            renderTabContent();
+        }
+
+        function setActiveTab(tab) {
+            state.activeTab = tab;
+            renderTabContent();
+        }
+
+        function renderTabContent() {
+            const container = document.getElementById('tabContent');
+            const isTeacher = state.currentUser.role === 'teacher';
+
+            if (state.activeTab === 'dashboard') {
+                const totalStudents = state.students.length;
+                const totalL = state.students.filter(s => s.gender === 'L').length;
+                const totalP = state.students.filter(s => s.gender === 'P').length;
+
+                container.innerHTML = `
+                    <div class="space-y-6 fade-in">
+                        <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                            <div>
+                                <h2 class="text-2xl sm:text-3xl font-bold mb-2">Selamat Datang, ${state.currentUser.name}! 👋</h2>
+                                <p class="text-indigo-100 text-sm sm:text-base">Tahun Pelajaran: <b>${state.academicYear}</b> | Semester: <b>${state.semester}</b></p>
+                            </div>
+                            ${isTeacher ? `
+                            <div class="bg-white/10 backdrop-blur px-4 py-3 rounded-2xl border border-white/20 flex items-center space-x-3">
+                                <div>
+                                    <p class="text-xs text-indigo-200 font-semibold uppercase">Ubah Tahun / Sem</p>
+                                    <div class="flex gap-2 mt-1">
+                                        <input type="text" id="inputAcademicYear" value="${state.academicYear}" class="w-24 px-2 py-1 bg-white/20 text-white rounded text-xs font-bold focus:outline-none" placeholder="2025/2026">
+                                        <select id="inputSemester" class="px-2 py-1 bg-indigo-700 text-white rounded text-xs font-bold focus:outline-none">
+                                            <option value="Ganjil" ${state.semester === 'Ganjil' ? 'selected' : ''}>Ganjil</option>
+                                            <option value="Genap" ${state.semester === 'Genap' ? 'selected' : ''}>Genap</option>
+                                        </select>
+                                        <button onclick="updateSettings()" class="px-3 py-1 bg-white text-indigo-600 rounded text-xs font-bold hover:bg-indigo-50">Simpan</button>
+                                    </div>
+                                </div>
+                            </div>
+                            ` : ''}
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-4">
+                                <div class="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center text-2xl font-bold">
+                                    <i class="fa-solid fa-users"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Siswa</p>
+                                    <h3 class="text-2xl font-bold text-slate-800">${totalStudents} Siswa</h3>
+                                    <p class="text-xs text-slate-500">${totalL} Laki-laki, ${totalP} Perempuan</p>
+                                </div>
+                            </div>
+                            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-4">
+                                <div class="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-2xl font-bold">
+                                    <i class="fa-solid fa-bullhorn"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Pengumuman Aktif</p>
+                                    <h3 class="text-2xl font-bold text-slate-800">${state.announcements.length} Info</h3>
+                                    <p class="text-xs text-slate-500">Pemberitahuan terbaru</p>
+                                </div>
+                            </div>
+                            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-4">
+                                <div class="w-14 h-14 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center text-2xl font-bold">
+                                    <i class="fa-solid fa-award"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Kurikulum P5</p>
+                                    <h3 class="text-2xl font-bold text-slate-800">Proyek Profil</h3>
+                                    <p class="text-xs text-slate-500">Pelajar Pancasila</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        ${!isTeacher ? renderParentChildWidget() : ''}
+                    </div>
+                `;
+            } else if (state.activeTab === 'students' && isTeacher) {
+                let rows = state.students.map((s, idx) => `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="px-6 py-4 text-sm font-medium text-slate-800">${idx + 1}</td>
+                        <td class="px-6 py-4 text-sm text-slate-600">${s.nisn}</td>
+                        <td class="px-6 py-4 text-sm font-semibold text-slate-900">${s.name}</td>
+                        <td class="px-6 py-4 text-sm text-slate-600">${s.gender === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
+                        <td class="px-6 py-4 text-sm"><span class="px-2.5 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-semibold">${s.p5}</span></td>
+                        <td class="px-6 py-4 text-right text-sm space-x-2">
+                            <button onclick="openEditStudentModal(${s.id})" class="text-indigo-600 hover:text-indigo-800 font-medium"><i class="fa-solid fa-pen-to-square"></i> Edit</button>
+                        </td>
+                    </tr>
+                `).join('');
+
+                container.innerHTML = `
+                    <div class="space-y-6 fade-in">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h2 class="text-xl font-bold text-slate-900">Data Siswa</h2>
+                                <p class="text-xs text-slate-500">Daftar lengkap siswa kelas 4.</p>
+                            </div>
+                            <button onclick="openAddStudentModal()" class="px-4 py-2.5 bg-indigo-600 text-white font-semibold rounded-xl text-sm hover:bg-indigo-700 transition shadow-md shadow-indigo-600/20">
+                                <i class="fa-solid fa-plus mr-1"></i> Tambah Siswa
+                            </button>
+                        </div>
+
+                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="bg-slate-50 border-b border-slate-200 text-xs uppercase font-semibold text-slate-500 tracking-wider">
+                                            <th class="px-6 py-3">No</th>
+                                            <th class="px-6 py-3">NISN</th>
+                                            <th class="px-6 py-3">Nama Siswa</th>
+                                            <th class="px-6 py-3">Gender</th>
+                                            <th class="px-6 py-3">Proyek P5</th>
+                                            <th class="px-6 py-3 text-right">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-200">
+                                        ${rows}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else if (state.activeTab === 'grades' && isTeacher) {
+                let gradeRows = state.students.map((s, idx) => `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="px-4 py-4 text-sm font-medium text-slate-800">${idx + 1}</td>
+                        <td class="px-4 py-4 text-sm font-semibold text-slate-900">${s.name}</td>
+                        <!-- Matematika -->
+                        <td class="px-2 py-4"><input type="number" value="${s.grades.matematika.uh[0]}" onchange="updateGrade(${s.id}, 'matematika', 'uh0', this.value)" class="w-14 px-2 py-1 bg-slate-50 border border-slate-200 rounded text-center text-sm"></td>
+                        <td class="px-2 py-4"><input type="number" value="${s.grades.matematika.uh[1]}" onchange="updateGrade(${s.id}, 'matematika', 'uh1', this.value)" class="w-14 px-2 py-1 bg-slate-50 border border-slate-200 rounded text-center text-sm"></td>
+                        <td class="px-2 py-4"><input type="number" value="${s.grades.matematika.sts}" onchange="updateGrade(${s.id}, 'matematika', 'sts', this.value)" class="w-14 px-2 py-1 bg-indigo-50 border border-indigo-200 rounded text-center text-sm font-bold text-indigo-700"></td>
+                        <td class="px-2 py-4"><input type="number" value="${s.grades.matematika.sas}" onchange="updateGrade(${s.id}, 'matematika', 'sas', this.value)" class="w-14 px-2 py-1 bg-purple-50 border border-purple-200 rounded text-center text-sm font-bold text-purple-700"></td>
+                        
+                        <!-- IPAS -->
+                        <td class="px-2 py-4 border-l border-slate-200"><input type="number" value="${s.grades.ipas.uh[0]}" onchange="updateGrade(${s.id}, 'ipas', 'uh0', this.value)" class="w-14 px-2 py-1 bg-slate-50 border border-slate-200 rounded text-center text-sm"></td>
+                        <td class="px-2 py-4"><input type="number" value="${s.grades.ipas.uh[1]}" onchange="updateGrade(${s.id}, 'ipas', 'uh1', this.value)" class="w-14 px-2 py-1 bg-slate-50 border border-slate-200 rounded text-center text-sm"></td>
+                        <td class="px-2 py-4"><input type="number" value="${s.grades.ipas.sts}" onchange="updateGrade(${s.id}, 'ipas', 'sts', this.value)" class="w-14 px-2 py-1 bg-indigo-50 border border-indigo-200 rounded text-center text-sm font-bold text-indigo-700"></td>
+                        <td class="px-2 py-4"><input type="number" value="${s.grades.ipas.sas}" onchange="updateGrade(${s.id}, 'ipas', 'sas', this.value)" class="w-14 px-2 py-1 bg-purple-50 border border-purple-200 rounded text-center text-sm font-bold text-purple-700"></td>
+
+                        <!-- B. Indo -->
+                        <td class="px-2 py-4 border-l border-slate-200"><input type="number" value="${s.grades.bindo.uh[0]}" onchange="updateGrade(${s.id}, 'bindo', 'uh0', this.value)" class="w-14 px-2 py-1 bg-slate-50 border border-slate-200 rounded text-center text-sm"></td>
+                        <td class="px-2 py-4"><input type="number" value="${s.grades.bindo.uh[1]}" onchange="updateGrade(${s.id}, 'bindo', 'uh1', this.value)" class="w-14 px-2 py-1 bg-slate-50 border border-slate-200 rounded text-center text-sm"></td>
+                        <td class="px-2 py-4"><input type="number" value="${s.grades.bindo.sts}" onchange="updateGrade(${s.id}, 'bindo', 'sts', this.value)" class="w-14 px-2 py-1 bg-indigo-50 border border-indigo-200 rounded text-center text-sm font-bold text-indigo-700"></td>
+                        <td class="px-2 py-4"><input type="number" value="${s.grades.bindo.sas}" onchange="updateGrade(${s.id}, 'bindo', 'sas', this.value)" class="w-14 px-2 py-1 bg-purple-50 border border-purple-200 rounded text-center text-sm font-bold text-purple-700"></td>
+                    </tr>
+                `).join('');
+
+                container.innerHTML = `
+                    <div class="space-y-6 fade-in">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h2 class="text-xl font-bold text-slate-900">Buku Penilaian (UH, STS, SAS)</h2>
+                                <p class="text-xs text-slate-500">Kelola nilai Ulangan Harian (UH 1 & UH 2), Sumatif Tengah Semester (STS), dan Sumatif Akhir Semester (SAS).</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse text-sm">
+                                    <thead>
+                                        <tr class="bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-600 text-center">
+                                            <th class="px-4 py-3 text-left">No</th>
+                                            <th class="px-4 py-3 text-left">Nama Siswa</th>
+                                            <th colspan="4" class="px-2 py-3 bg-indigo-50 text-indigo-800 border-l border-slate-200">Matematika</th>
+                                            <th colspan="4" class="px-2 py-3 bg-emerald-50 text-emerald-800 border-l border-slate-200">IPAS</th>
+                                            <th colspan="4" class="px-2 py-3 bg-amber-50 text-amber-800 border-l border-slate-200">Bahasa Indonesia</th>
+                                        </tr>
+                                        <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-semibold text-slate-500 text-center">
+                                            <th colspan="2"></th>
+                                            <!-- Mat -->
+                                            <th class="px-1 py-2">UH1</th><th class="px-1 py-2">UH2</th><th class="px-1 py-2 text-indigo-700">STS</th><th class="px-1 py-2 text-purple-700">SAS</th>
+                                            <!-- IPAS -->
+                                            <th class="px-1 py-2 border-l border-slate-200">UH1</th><th class="px-1 py-2">UH2</th><th class="px-1 py-2 text-indigo-700">STS</th><th class="px-1 py-2 text-purple-700">SAS</th>
+                                            <!-- Indo -->
+                                            <th class="px-1 py-2 border-l border-slate-200">UH1</th><th class="px-1 py-2">UH2</th><th class="px-1 py-2 text-indigo-700">STS</th><th class="px-1 py-2 text-purple-700">SAS</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-200">
+                                        ${gradeRows}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else if (state.activeTab === 'attendance' && isTeacher) {
+                let rows = state.students.map((s, idx) => `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="px-6 py-4 text-sm font-medium text-slate-800">${idx + 1}</td>
+                        <td class="px-6 py-4 text-sm font-semibold text-slate-900">${s.name}</td>
+                        <td class="px-6 py-4 text-sm">
+                            <input type="number" min="0" value="${s.attendance.sakit}" onchange="updateAttendance(${s.id}, 'sakit', this.value)" class="w-16 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-center">
+                        </td>
+                        <td class="px-6 py-4 text-sm">
+                            <input type="number" min="0" value="${s.attendance.izin}" onchange="updateAttendance(${s.id}, 'izin', this.value)" class="w-16 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-center">
+                        </td>
+                        <td class="px-6 py-4 text-sm">
+                            <input type="number" min="0" value="${s.attendance.alfa}" onchange="updateAttendance(${s.id}, 'alfa', this.value)" class="w-16 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-center">
+                        </td>
+                    </tr>
+                `).join('');
+
+                container.innerHTML = `
+                    <div class="space-y-6 fade-in">
+                        <div>
+                            <h2 class="text-xl font-bold text-slate-900">Rekapitulasi Absensi Siswa</h2>
+                            <p class="text-xs text-slate-500">Catat jumlah ketidakhadiran siswa selama semester ini.</p>
+                        </div>
+
+                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="bg-slate-50 border-b border-slate-200 text-xs uppercase font-semibold text-slate-500 tracking-wider">
+                                            <th class="px-6 py-3">No</th>
+                                            <th class="px-6 py-3">Nama Siswa</th>
+                                            <th class="px-6 py-3">Sakit</th>
+                                            <th class="px-6 py-3">Izin</th>
+                                            <th class="px-6 py-3">Alfa</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-200">
+                                        ${rows}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else if (state.activeTab === 'child_detail' && !isTeacher) {
+                container.innerHTML = renderParentChildWidget();
+            } else if (state.activeTab === 'ai_consultant' && !isTeacher) {
+                container.innerHTML = renderAiConsultantTab();
+            } else if (state.activeTab === 'announcements') {
+                let announcementCards = state.announcements.map(a => `
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-2">
+                        <div class="flex justify-between items-start">
+                            <h3 class="font-bold text-slate-900 text-lg">${escapeHtml(a.title)}</h3>
+                            <span class="text-xs font-semibold px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full">${a.date}</span>
+                        </div>
+                        <p class="text-slate-600 text-sm leading-relaxed">${escapeHtml(a.content)}</p>
+                    </div>
+                `).join('');
+
+                container.innerHTML = `
+                    <div class="space-y-6 fade-in">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h2 class="text-xl font-bold text-slate-900">Pengumuman & Agenda Kelas</h2>
+                                <p class="text-xs text-slate-500">Informasi resmi dari wali kelas.</p>
+                            </div>
+                            ${isTeacher ? `
+                            <button onclick="openAddAnnouncementModal()" class="px-4 py-2.5 bg-indigo-600 text-white font-semibold rounded-xl text-sm hover:bg-indigo-700 transition shadow-md shadow-indigo-600/20">
+                                <i class="fa-solid fa-plus mr-1"></i> Buat Pengumuman
+                            </button>
+                            ` : ''}
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-4">
+                            ${announcementCards}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function renderParentChildWidget() {
+            const student = state.students.find(s => s.id === state.currentUser.studentId);
+            if(!student) return `<div class="p-6 bg-white rounded-2xl">Data siswa tidak ditemukan.</div>`;
+
+            return `
+                <div class="space-y-6 fade-in">
+                    <div class="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-6 mb-6 gap-4">
+                            <div>
+                                <span class="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-semibold">Tahun Pelajaran ${state.academicYear} - Semester ${state.semester}</span>
+                                <h2 class="text-2xl font-bold text-slate-900 mt-1">${student.name}</h2>
+                                <p class="text-xs text-slate-500">NISN: ${student.nisn} | Tanggal Lahir: ${student.birthDate}</p>
+                            </div>
+                            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 text-center">
+                                <p class="text-xs text-slate-400 font-semibold uppercase">Proyek P5</p>
+                                <p class="text-sm font-bold text-indigo-600 mt-1">${student.p5}</p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            <div>
+                                <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4"><i class="fa-solid fa-book-open mr-2 text-indigo-600"></i> Nilai Mata Pelajaran (UH, STS, SAS)</h3>
+                                <div class="space-y-3">
+                                    <div class="p-4 bg-slate-50 rounded-xl space-y-2">
+                                        <div class="flex justify-between font-bold text-sm text-slate-800">
+                                            <span>Matematika</span>
+                                            <span>STS: ${student.grades.matematika.sts} | SAS: ${student.grades.matematika.sas}</span>
+                                        </div>
+                                        <div class="text-xs text-slate-500">Nilai UH 1: ${student.grades.matematika.uh[0]} | UH 2: ${student.grades.matematika.uh[1]}</div>
+                                    </div>
+                                    <div class="p-4 bg-slate-50 rounded-xl space-y-2">
+                                        <div class="flex justify-between font-bold text-sm text-slate-800">
+                                            <span>IPAS</span>
+                                            <span>STS: ${student.grades.ipas.sts} | SAS: ${student.grades.ipas.sas}</span>
+                                        </div>
+                                        <div class="text-xs text-slate-500">Nilai UH 1: ${student.grades.ipas.uh[0]} | UH 2: ${student.grades.ipas.uh[1]}</div>
+                                    </div>
+                                    <div class="p-4 bg-slate-50 rounded-xl space-y-2">
+                                        <div class="flex justify-between font-bold text-sm text-slate-800">
+                                            <span>Bahasa Indonesia</span>
+                                            <span>STS: ${student.grades.bindo.sts} | SAS: ${student.grades.bindo.sas}</span>
+                                        </div>
+                                        <div class="text-xs text-slate-500">Nilai UH 1: ${student.grades.bindo.uh[0]} | UH 2: ${student.grades.bindo.uh[1]}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4"><i class="fa-solid fa-clipboard-user mr-2 text-indigo-600"></i> Rekap Absensi</h3>
+                                <div class="grid grid-cols-3 gap-3 text-center mb-6">
+                                    <div class="p-3 bg-amber-50 rounded-xl border border-amber-100">
+                                        <p class="text-xs font-semibold text-amber-600">Sakit</p>
+                                        <p class="text-xl font-bold text-amber-700 mt-1">${student.attendance.sakit}</p>
+                                    </div>
+                                    <div class="p-3 bg-blue-50 rounded-xl border border-blue-100">
+                                        <p class="text-xs font-semibold text-blue-600">Izin</p>
+                                        <p class="text-xl font-bold text-blue-700 mt-1">${student.attendance.izin}</p>
+                                    </div>
+                                    <div class="p-3 bg-rose-50 rounded-xl border border-rose-100">
+                                        <p class="text-xs font-semibold text-rose-600">Alfa</p>
+                                        <p class="text-xl font-bold text-rose-700 mt-1">${student.attendance.alfa}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-purple-50 border border-purple-100 rounded-2xl p-5">
+                            <h4 class="text-xs font-bold text-purple-700 uppercase tracking-wider mb-2"><i class="fa-solid fa-note-sticky mr-1.5"></i> Catatan Guru</h4>
+                            <p class="text-slate-700 text-sm leading-relaxed">${student.notes || "Belum ada catatan khusus."}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderAiConsultantTab() {
+            const student = state.students.find(s => s.id === state.currentUser.studentId);
+            return `
+                <div class="space-y-6 fade-in">
+                    <div class="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200">
+                        <div class="flex items-center space-x-3 mb-6">
+                            <div class="w-12 h-12 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center text-xl font-bold">
+                                <i class="fa-solid fa-robot"></i>
+                            </div>
+                            <div>
+                                <h2 class="text-xl font-bold text-slate-900">Konsultan Belajar AI</h2>
+                                <p class="text-xs text-slate-500">Tanyakan rekomendasi tips belajar atau latihan soal untuk ${student ? student.name : 'Anak'}.</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 h-80 overflow-y-auto mb-4 space-y-4" id="chatContainer">
+                            <div class="flex items-start space-x-3">
+                                <div class="w-8 h-8 bg-purple-600 text-white rounded-full flex items-center justify-center text-xs flex-shrink-0"><i class="fa-solid fa-robot"></i></div>
+                                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 text-sm text-slate-700 max-w-lg">
+                                    Halo! Saya asisten AI pendidikan kelas 4 SD. Ada yang ingin Anda diskusikan untuk membantu belajar di rumah?
+                                </div>
+                            </div>
+                        </div>
+
+                        <form onsubmit="handleAiChatSubmit(event)" class="flex gap-2">
+                            <input type="text" id="aiChatInput" required placeholder="Contoh: Berikan contoh latihan soal matematika pecahan..." class="flex-grow px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm">
+                            <button type="submit" class="px-6 py-3 bg-purple-600 text-white font-semibold rounded-xl hover:bg-purple-700 transition shadow-md text-sm flex items-center space-x-2">
+                                <i class="fa-solid fa-paper-plane"></i>
+                                <span class="hidden sm:inline">Kirim</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function generateAiComment() {
+            const name = document.getElementById('inputStudentName').value || "Siswa";
+            const btn = event.currentTarget;
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Menulis...</span>';
+
+            const systemPrompt = "Anda adalah guru kelas 4 SD yang ramah. Buat catatan perkembangan siswa 1-2 kalimat pendek dalam Bahasa Indonesia.";
+            const userQuery = `Siswa bernama ${name}. Buatlah catatan rapor positif dan membangun.`;
+
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent`;
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] }
+            };
+
+            try {
+                let response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if(response.ok) {
+                    const result = await response.json();
+                    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if(text) document.getElementById('inputStudentNotes').value = text.trim();
+                }
+            } catch(e) {
+                showModal("Error", "Gagal menghubungi AI.", "error");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        }
+
+        async function handleAiChatSubmit(e) {
+            e.preventDefault();
+            const inputEl = document.getElementById('aiChatInput');
+            const chatContainer = document.getElementById('chatContainer');
+            const query = inputEl.value.trim();
+            if(!query) return;
+
+            chatContainer.innerHTML += `<div class="flex items-start justify-end space-x-3"><div class="bg-purple-600 text-white p-4 rounded-2xl shadow-sm text-sm max-w-lg">${escapeHtml(query)}</div></div>`;
+            inputEl.value = "";
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent`;
+            const payload = { contents: [{ parts: [{ text: query }] }] };
+
+            try {
+                let response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if(response.ok) {
+                    const result = await response.json();
+                    const reply = result.candidates?.[0]?.content?.parts?.[0]?.text || "Maaf, terjadi kendala.";
+                    chatContainer.innerHTML += `<div class="flex items-start space-x-3"><div class="w-8 h-8 bg-purple-600 text-white rounded-full flex items-center justify-center text-xs flex-shrink-0"><i class="fa-solid fa-robot"></i></div><div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 text-sm text-slate-700 max-w-lg">${escapeHtml(reply)}</div></div>`;
+                }
+            } catch(err) {
+                chatContainer.innerHTML += `<div class="text-xs text-rose-500 text-center">Gagal merespons.</div>`;
+            }
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function updateGrade(studentId, subject, type, val) {
+            const student = state.students.find(s => s.id === studentId);
+            if(student) {
+                const numVal = parseInt(val) || 0;
+                if(type === 'uh0') student.grades[subject].uh[0] = numVal;
+                else if(type === 'uh1') student.grades[subject].uh[1] = numVal;
+                else if(type === 'sts') student.grades[subject].sts = numVal;
+                else if(type === 'sas') student.grades[subject].sas = numVal;
+                saveState();
+            }
+        }
+
+        function updateAttendance(id, type, val) {
+            const student = state.students.find(s => s.id === id);
+            if(student) {
+                student.attendance[type] = parseInt(val) || 0;
+                saveState();
+            }
+        }
+
+        function updateSettings() {
+            const yr = document.getElementById('inputAcademicYear').value.trim();
+            const sem = document.getElementById('inputSemester').value;
+            if(yr) {
+                state.academicYear = yr;
+                state.semester = sem;
+                saveState();
+                showModal("Berhasil", "Pengaturan Tahun Pelajaran & Semester diperbarui.");
+                renderDashboard();
+            }
+        }
+
+        function openAddAnnouncementModal() {
+            const title = prompt("Judul Pengumuman:");
+            if(!title) return;
+            const content = prompt("Isi Pengumuman:");
+            if(!content) return;
+            state.announcements.unshift({ id: Date.now(), title, date: new Date().toISOString().split('T')[0], content });
+            saveState();
+            renderTabContent();
+            showModal("Berhasil", "Pengumuman berhasil dipublikasikan.");
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        window.onload = function() {
+            renderApp();
+        };
+    </script>
+</body>
+</html>
